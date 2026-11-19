@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diamond Ring — Interactive ASCII Animation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Great+Vibes&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #06060a;
+      color: #f4f4f8;
+      overflow-x: hidden;
+    }
+    .mono-hud {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    .stage-glow {
+      background:
+        radial-gradient(circle at 50% 44%, rgba(168, 198, 255, 0.08), rgba(255, 122, 182, 0.04) 38%, transparent 70%),
+        #050508;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 9999px;
+    }
+    .note-glow {
+      box-shadow:
+        0 0 30px rgba(192, 80, 140, 0.25),
+        0 0 60px rgba(168, 50, 120, 0.15),
+        0 0 100px rgba(120, 40, 100, 0.08),
+        inset 0 1px 0 rgba(255, 180, 220, 0.08);
+    }
+    .romantic-note {
+      font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+      font-style: italic;
+      letter-spacing: 0.02em;
+      text-shadow:
+        0 0 12px rgba(220, 100, 160, 0.55),
+        0 0 28px rgba(180, 60, 130, 0.35),
+        0 0 48px rgba(140, 40, 100, 0.2);
+      color: #f8d0e4;
+    }
+    .romantic-note .heart {
+      color: #e88bb8;
+      text-shadow: 0 0 10px rgba(232, 139, 184, 0.7);
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-[#06060a] text-zinc-100 selection:bg-pink-500/30 selection:text-pink-100">
+  <!-- Top Header & Telemetry HUD -->
+  <header class="w-full border-b border-white/10 bg-zinc-950/80 backdrop-blur-md shrink-0 z-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-end gap-3">
+      <!-- Live Telemetry Readout -->
+      <div class="mono-hud flex items-center gap-3 sm:gap-4 text-xs text-zinc-300 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-1.5">
+        <span id="statusDot" class="inline-block w-2 h-2 rounded-full bg-pink-400 animate-pulse"></span>
+        <span id="hudTime">t 00.00s</span>
+        <span class="text-white/20">|</span>
+        <span id="hudYaw">rot 000.0°</span>
+        <span class="hidden md:inline text-white/20">|</span>
+        <span id="hudGlints" class="hidden md:inline text-amber-200/90">glints 0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content: Big Ring Stage -->
+  <main class="flex-1 w-full flex flex-col relative min-h-0">
+    <!-- Ring Stage - takes almost all remaining space -->
+    <section
+      aria-label="ASCII Diamond Ring Stage"
+      class="relative flex-1 w-full min-h-0 stage-glow overflow-hidden"
+    >
+      <div id="canvasWrapper" class="relative w-full h-full select-none">
+        <canvas id="ringCanvas" class="w-full h-full block cursor-pointer" title="Tap or click to pause/resume"></canvas>
+      </div>
+
+      <!-- 4 small control buttons - left corner -->
+      <div class="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+        <button
+          id="togglePlayBtn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-pink-500/90 hover:bg-pink-400 active:scale-[0.98] text-zinc-950 font-semibold text-xs px-2.5 py-1.5 shadow-md shadow-pink-500/25 transition cursor-pointer backdrop-blur-sm"
+        >
+          <span id="playIcon">❚❚</span>
+          <span id="playLabel">Pause</span>
+        </button>
+
+        <button
+          id="restartBtn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] active:scale-[0.98] border border-white/10 text-zinc-100 font-medium text-xs px-2.5 py-1.5 transition cursor-pointer backdrop-blur-sm"
+        >
+          <span>↺</span>
+          <span>Restart</span>
+        </button>
+
+        <button
+          id="trailBtn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] active:scale-[0.98] border border-white/10 text-zinc-100 font-medium text-xs px-2.5 py-1.5 transition cursor-pointer backdrop-blur-sm"
+          title="Toggle glowing motion trails"
+        >
+          <span>✨</span>
+          <span id="trailLabel">Trails: ON</span>
+        </button>
+
+        <button
+          id="speedBtn"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] active:scale-[0.98] border border-white/10 text-zinc-200 font-medium text-xs px-2.5 py-1.5 transition cursor-pointer backdrop-blur-sm"
+          title="Cycle speed and force restart from t = 0.00s"
+        >
+          <span>⚡</span>
+          <span id="speedLabel">Speed: 1.0x</span>
+        </button>
+      </div>
+
+      <!-- Non-intrusive Status Banner -->
+      <div id="statusToast" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 hidden rounded-xl bg-emerald-500/15 border border-emerald-400/30 px-4 py-2 text-xs text-emerald-200 backdrop-blur-md shadow-lg"></div>
+    </section>
+
+    <!-- Fixed elegant note at bottom -->
+    <aside
+      aria-label="Love Note"
+      class="w-full border-t border-pink-400/25 bg-zinc-950/95 backdrop-blur-md note-glow shrink-0"
+    >
+      <div class="max-w-3xl mx-auto px-5 py-3.5 sm:py-4 text-center">
+        <p class="romantic-note text-base sm:text-lg md:text-xl leading-relaxed">
+          <span class="heart">♡</span>
+          &nbsp;No matter how many terms the world takes. My favourite view is always next to you — your Ahmed.
+          &nbsp;<span class="heart">♡</span>
+        </p>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      /**
+       * Deterministic 32-bit PRNG (Mulberry32) so particle layouts and starfields
+       * remain consistent across reloads and force-restarts.
+       */
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function randomArray(seed, count) {
+        const rng = mulberry32(seed);
+        const out = new Float32Array(count);
+        for (let i = 0; i < count; i++) out[i] = rng();
+        return out;
+      }
+
+      // Animation timeline & scene constants
+      const TAU = Math.PI * 2;
+      const LOOP = 20.0;
+      const BUILD = 3.2;
+      const TURN = 12.000222;
+      const FLOOR = -0.780222;
+
+      const DRAW_START = 0.3;
+      const DRAW_END = 5.6;
+
+      // Material and effect color tags
+      const TAG_BAND = 0;
+      const TAG_PRONG = 1;
+      const TAG_GEM = 2;
+      const TAG_GLINT = 3;
+      const TAG_FIRE_R = 4;
+      const TAG_FIRE_B = 5;
+      const TAG_FIRE_G = 6;
+      const TAG_DUST = 7;
+      const TAG_REFL = 8;
+      const TAG_STAR = 9;
+
+      // ASCII density pools from sparse to dense
+      const POOLS = [
+        "1il!;:",
+        "rtfjcvxz=+",
+        "aeoun0{}[]<>",
+        "08B$#&%Q"
+      ];
+
+      const PALETTE = [
+        "#d6dce8",
+        "#e8ecf4",
+        "#e2eeff",
+        "#ffffff",
+        "#ffaac8",
+        "#a0d2ff",
+        "#ffe6a0",
+        "#ffd68c",
+        "#9696a5",
+        "#78788c"
+      ];
+
+      function clamp01(v) {
+        return v < 0 ? 0 : v > 1 ? 1 : v;
+      }
+
+      function smoothstep(x) {
+        const t = clamp01(x);
+        return t * t * (3 - 2 * t);
+      }
+
+      function norm3(x, y, z) {
+        const len = Math.hypot(x, y, z) || 1;
+        return [x / len, y / len, z / len];
+      }
+
+      function cross3(ax, ay, az, bx, by, bz) {
+        return [
+          ay * bz - az * by,
+          az * bx - ax * bz,
+          ax * by - ay * bx
+        ];
+      }
+
+      // Diamond ring proportions
+      const R_BAND = 0.55;
+      const TUBE = 0.065;
+      const GIRDLE_Y = 0.88;
+      const GIRDLE_R = 0.25;
+      const TABLE_Y = 1.00;
+      const TABLE_R = 0.135;
+      const CULET_Y = 0.66;
+
+      /**
+       * Constructs point cloud samples with normals, part IDs, facet IDs,
+       * and progressive reveal order for the band, four prongs, and 16-fold diamond.
+       */
+      function buildRingMesh() {
+        const px = [];
+        const py = [];
+        const pz = [];
+        const nx = [];
+        const ny = [];
+        const nz = [];
+        const tags = [];
+        const parts = [];
+        const gemFacets = [];
+        const orders = [];
+
+        // 1. Metallic band
+        const segA = 360;
+        const segB = 28;
+        for (let ia = 0; ia < segA; ia++) {
+          const a = (TAU * ia) / segA;
+          const cosA = Math.cos(a);
+          const sinA = Math.sin(a);
+          const thinFactor = Math.pow(Math.max(0, sinA), 6);
+          const rr = TUBE * (1 - 0.350222 * thinFactor);
+
+          const angDiff = Math.atan2(Math.sin(a + Math.PI * 0.5), Math.cos(a + Math.PI * 0.5));
+          const upBand = Math.abs(angDiff) / Math.PI;
+
+          for (let ib = 0; ib < segB; ib++) {
+            const b = (TAU * ib) / segB;
+            const cosB = Math.cos(b);
+            const sinB = Math.sin(b);
+
+            const nRawX = cosA * cosB;
+            const nRawY = sinA * cosB;
+            const nRawZ = sinB;
+            const [nnx, nny, nnz] = norm3(nRawX, nRawY, nRawZ);
+
+            const pX = cosA * R_BAND + nnx * rr;
+            const pY = sinA * R_BAND + nny * rr;
+            const pZ = nnz * (rr * 1.5);
+
+            px.push(pX);
+            py.push(pY);
+            pz.push(pZ);
+            nx.push(nnx);
+            ny.push(nny);
+            nz.push(nnz);
+            tags.push(TAG_BAND);
+            parts.push(0);
+            gemFacets.push(0);
+            orders.push(upBand);
+          }
+        }
+
+        // 2. Four prongs supporting the gem
+        for (let ip = 0; ip < 4; ip++) {
+          const ang = (TAU * (ip + 0.5)) / 4;
+          const cosP = Math.cos(ang);
+          const sinP = Math.sin(ang);
+
+          const base = [0.08 * cosP, R_BAND + 0.02, 0.08 * sinP];
+          const tip = [(GIRDLE_R + 0.015) * cosP, TABLE_Y - 0.03, (GIRDLE_R + 0.015) * sinP];
+
+          const dx = tip[0] - base[0];
+          const dy = tip[1] - base[1];
+          const dz = tip[2] - base[2];
+          const [dirX, dirY, dirZ] = norm3(dx, dy, dz);
+
+          const [sx0, sy0, sz0] = cross3(dirX, dirY, dirZ, 0, 0, 1.0);
+          const [sx, sy, sz] = norm3(sx0, sy0, sz0);
+          const [wx, wy, wz] = cross3(sx, sy, sz, dirX, dirY, dirZ);
+
+          const uSteps = 24;
+          const phiSteps = 10;
+          for (let iu = 0; iu < uSteps; iu++) {
+            const u = iu / (uSteps - 1);
+            const cX = base[0] + dx * u;
+            const cY = base[1] + dy * u;
+            const cZ = base[2] + dz * u;
+            const prongOrder = 1.0 + ((cY - R_BAND) / (TABLE_Y - R_BAND)) * 0.25;
+
+            for (let iphi = 0; iphi < phiSteps; iphi++) {
+              const phi = (TAU * iphi) / phiSteps;
+              const cosPhi = Math.cos(phi);
+              const sinPhi = Math.sin(phi);
+              const rnx = cosPhi * sx + sinPhi * wx;
+              const rny = cosPhi * sy + sinPhi * wy;
+              const rnz = cosPhi * sz + sinPhi * wz;
+
+              px.push(cX + rnx * 0.022);
+              py.push(cY + rny * 0.022);
+              pz.push(cZ + rnz * 0.022);
+              nx.push(rnx);
+              ny.push(rny);
+              nz.push(rnz);
+              tags.push(TAG_PRONG);
+              parts.push(1);
+              gemFacets.push(0);
+              orders.push(prongOrder);
+            }
+          }
+        }
+
+        // 3. Faceted brilliant-cut diamond
+        const mFacets = 16;
+        const gridSteps = 11;
+        let facetId = 0;
+
+        function addTriangleFacet(A, B, C, rawNormal) {
+          const [nnx, nny, nnz] = norm3(rawNormal[0], rawNormal[1], rawNormal[2]);
+          const currentFacet = facetId++;
+          for (let iu = 0; iu < gridSteps; iu++) {
+            const u = iu / (gridSteps - 1);
+            for (let iv = 0; iv < gridSteps; iv++) {
+              const v = iv / (gridSteps - 1);
+              if (u + v <= 1.0) {
+                const vx = A[0] + (B[0] - A[0]) * u + (C[0] - A[0]) * v;
+                const vy = A[1] + (B[1] - A[1]) * u + (C[1] - A[1]) * v;
+                const vz = A[2] + (B[2] - A[2]) * u + (C[2] - A[2]) * v;
+
+                const gemOrder = 1.25 + ((vy - CULET_Y) / (TABLE_Y - CULET_Y)) * 0.45;
+
+                px.push(vx);
+                py.push(vy);
+                pz.push(vz);
+                nx.push(nnx);
+                ny.push(nny);
+                nz.push(nnz);
+                tags.push(TAG_GEM);
+                parts.push(10 + currentFacet);
+                gemFacets.push(currentFacet);
+                orders.push(gemOrder);
+              }
+            }
+          }
+        }
+
+        const culet = [0, CULET_Y, 0];
+        const tableCenter = [0, TABLE_Y, 0];
+
+        for (let i = 0; i < mFacets; i++) {
+          const a0 = (TAU * i) / mFacets;
+          const a1 = (TAU * (i + 1)) / mFacets;
+
+          const g0 = [GIRDLE_R * Math.cos(a0), GIRDLE_Y, GIRDLE_R * Math.sin(a0)];
+          const g1 = [GIRDLE_R * Math.cos(a1), GIRDLE_Y, GIRDLE_R * Math.sin(a1)];
+          const t0 = [TABLE_R * Math.cos(a0), TABLE_Y, TABLE_R * Math.sin(a0)];
+          const t1 = [TABLE_R * Math.cos(a1), TABLE_Y, TABLE_R * Math.sin(a1)];
+
+          let cr1 = cross3(
+            g1[0] - g0[0], g1[1] - g0[1], g1[2] - g0[2],
+            t0[0] - g0[0], t0[1] - g0[1], t0[2] - g0[2]
+          );
+          if (cr1[1] < 0) cr1 = [-cr1[0], -cr1[1], -cr1[2]];
+          addTriangleFacet(g0, g1, t0, cr1);
+
+          addTriangleFacet(g1, t1, t0, [cr1[0], cr1[1] * 1.15, cr1[2]]);
+
+          let pav = cross3(
+            culet[0] - g0[0], culet[1] - g0[1], culet[2] - g0[2],
+            g1[0] - g0[0], g1[1] - g0[1], g1[2] - g0[2]
+          );
+          if (pav[1] > 0) pav = [-pav[0], -pav[1], -pav[2]];
+          addTriangleFacet(g0, g1, culet, pav);
+
+          addTriangleFacet(tableCenter, t0, t1, [0, 1.0, 0]);
+        }
+
+        let maxOrder = 1.7;
+        for (let i = 0; i < orders.length; i++) {
+          if (orders[i] > maxOrder) maxOrder = orders[i];
+        }
+
+        return {
+          count: px.length,
+          px: new Float32Array(px),
+          py: new Float32Array(py),
+          pz: new Float32Array(pz),
+          nx: new Float32Array(nx),
+          ny: new Float32Array(ny),
+          nz: new Float32Array(nz),
+          tags: new Uint8Array(tags),
+          parts: new Int16Array(parts),
+          gemFacets: new Int16Array(gemFacets),
+          orders: new Float32Array(orders),
+          maxOrder
+        };
+      }
+
+      const RING = buildRingMesh();
+
+      // Seeded particle banks for sparks, burst ring, orbital halos, dust motes, and stars
+      const SPARK_COUNT = 1600;
+      const spkR0 = randomArray(1301, SPARK_COUNT);
+      const spkR1 = randomArray(1302, SPARK_COUNT);
+      const spkR2 = randomArray(1303, SPARK_COUNT);
+      const spkR3 = randomArray(1304, SPARK_COUNT);
+      const spkR4 = randomArray(1305, SPARK_COUNT);
+      const spkIdx = new Int32Array(SPARK_COUNT);
+      const spkBorn = new Float32Array(SPARK_COUNT);
+
+      for (let i = 0; i < SPARK_COUNT; i++) {
+        const idx = Math.min(RING.count - 1, Math.floor(spkR0[i] * RING.count));
+        spkIdx[i] = idx;
+        spkBorn[i] = DRAW_START + (RING.orders[idx] / RING.maxOrder) * (DRAW_END - DRAW_START);
+      }
+
+      const BURST_COUNT = 520;
+      const bstR0 = randomArray(1401, BURST_COUNT);
+      const bstR1 = randomArray(1402, BURST_COUNT);
+      const bstR2 = randomArray(1403, BURST_COUNT);
+
+      const HALO_COUNT = 680;
+      const halR0 = randomArray(1501, HALO_COUNT);
+      const halR1 = randomArray(1502, HALO_COUNT);
+
+      const DUST_COUNT = 400;
+      const dstR0 = randomArray(501, DUST_COUNT);
+      const dstR1 = randomArray(502, DUST_COUNT);
+      const dstR2 = randomArray(503, DUST_COUNT);
+      const dstR3 = randomArray(504, DUST_COUNT);
+
+      const STAR_COUNT = 85;
+      const strR0 = randomArray(201, STAR_COUNT);
+      const strR1 = randomArray(202, STAR_COUNT);
+      const strR2 = randomArray(203, STAR_COUNT);
+
+      // Camera basis
+      const EYE = [0.0, 0.85, 5.35];
+      const TARGET = [0.0, 0.22, 0.0];
+      const CAM_FWD = norm3(TARGET[0] - EYE[0], TARGET[1] - EYE[1], TARGET[2] - EYE[2]);
+      const CAM_RIGHT = norm3(...cross3(CAM_FWD[0], CAM_FWD[1], CAM_FWD[2], 0, 1.0, 0));
+      const CAM_UP = cross3(CAM_RIGHT[0], CAM_RIGHT[1], CAM_RIGHT[2], CAM_FWD[0], CAM_FWD[1], CAM_FWD[2]);
+      const VIEW_DIR = [-CAM_FWD[0], -CAM_FWD[1], -CAM_FWD[2]];
+
+      function spinAngle(t) {
+        return (TAU * Math.max(t - DRAW_END - 0.6, 0)) / TURN;
+      }
+
+      function flashIntensity(t) {
+        const d = (t - DRAW_END - 0.15) / 0.18;
+        return Math.exp(-(d * d));
+      }
+
+      // DOM references
+      const canvas = document.getElementById("ringCanvas");
+      const ctx = canvas.getContext("2d");
+      const wrapper = document.getElementById("canvasWrapper");
+
+      const hudTime = document.getElementById("hudTime");
+      const hudYaw = document.getElementById("hudYaw");
+      const hudGlints = document.getElementById("hudGlints");
+      const statusDot = document.getElementById("statusDot");
+
+      const togglePlayBtn = document.getElementById("togglePlayBtn");
+      const playIcon = document.getElementById("playIcon");
+      const playLabel = document.getElementById("playLabel");
+      const restartBtn = document.getElementById("restartBtn");
+      const speedBtn = document.getElementById("speedBtn");
+      const speedLabel = document.getElementById("speedLabel");
+      const trailBtn = document.getElementById("trailBtn");
+      const trailLabel = document.getElementById("trailLabel");
+      const statusToast = document.getElementById("statusToast");
+
+      const SPEEDS = [0.5, 1.0, 1.5, 2.0];
+
+      let simTime = 0.0;
+      let paused = false;
+      let speedIndex = 1; // Defaults to 1.0x
+      let trailsEnabled = true;
+
+      let cw = 7;
+      let ch = 11;
+      let cols = 120;
+      let rows = 50;
+      let aspect = 1.8;
+      let dpr = 1;
+
+      let partGrid = new Int16Array(1);
+      let depthGrid = new Float32Array(1);
+      let lumGrid = new Float32Array(1);
+      let tagGrid = new Uint8Array(1);
+      let charGrid = new Uint16Array(1);
+      let gxGrid = new Float32Array(1);
+      let gyGrid = new Float32Array(1);
+
+      const CHAR_LIST = [];
+      const CHAR_INDEX = new Map();
+      function registerChar(character) {
+        if (!CHAR_INDEX.has(character)) {
+          CHAR_INDEX.set(character, CHAR_LIST.length);
+          CHAR_LIST.push(character);
+        }
+        return CHAR_INDEX.get(character);
+      }
+
+      const BASE_CHARS = " .,:~+*^01|/\\-_#()x&%";
+      for (let i = 0; i < BASE_CHARS.length; i++) registerChar(BASE_CHARS[i]);
+      for (const pool of POOLS) {
+        for (let i = 0; i < pool.length; i++) registerChar(pool[i]);
+      }
+
+      const FILL_TABLE = POOLS.map((pool) => {
+        const arr = new Uint16Array(12);
+        for (let k = 0; k < 12; k++) {
+          arr[k] = registerChar(pool[k % pool.length]);
+        }
+        return arr;
+      });
+
+      const IDX_SPACE = registerChar(" ");
+      const IDX_STAR = registerChar("*");
+      const IDX_PLUS = registerChar("+");
+      const IDX_DOT = registerChar(".");
+      const IDX_PIPE = registerChar("|");
+      const IDX_DASH = registerChar("-");
+      const IDX_UNDER = registerChar("_");
+      const IDX_SLASH = registerChar("/");
+      const IDX_BACKSLASH = registerChar("\\");
+      const IDX_AMP = registerChar("&");
+      const IDX_EIGHT = registerChar("8");
+      const IDX_PCT = registerChar("%");
+
+      function showToast(text) {
+        statusToast.textContent = text;
+        statusToast.classList.remove("hidden");
+        clearTimeout(showToast._timer);
+        showToast._timer = setTimeout(() => {
+          statusToast.classList.add("hidden");
+        }, 2500);
+      }
+
+      /**
+       * Adapts ASCII cell dimensions, grid buffers, and high-DPI canvas scaling
+       * to the current container size.
+       */
+      function resizeStage() {
+        try {
+          const rect = wrapper.getBoundingClientRect();
+          const cssW = Math.max(280, Math.floor(rect.width));
+          const cssH = Math.max(240, Math.floor(rect.height));
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+          canvas.width = Math.floor(cssW * dpr);
+          canvas.height = Math.floor(cssH * dpr);
+
+          if (cssW < 480) {
+            cw = 5.5;
+            ch = 8.5;
+          } else if (cssW < 768) {
+            cw = 6.2;
+            ch = 9.8;
+          } else {
+            cw = 7.2;
+            ch = 11.2;
+          }
+
+          cols = Math.max(36, Math.floor(cssW / cw));
+          rows = Math.max(22, Math.floor(cssH / ch));
+          cw = cssW / cols;
+          ch = cssH / rows;
+          aspect = (cols * cw) / (rows * ch);
+
+          const total = cols * rows;
+          partGrid = new Int16Array(total);
+          depthGrid = new Float32Array(total);
+          lumGrid = new Float32Array(total);
+          tagGrid = new Uint8Array(total);
+          charGrid = new Uint16Array(total);
+          gxGrid = new Float32Array(total);
+          gyGrid = new Float32Array(total);
+
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.font = `500 ${Math.max(8, Math.round(ch * 0.94))}px "JetBrains Mono", ui-monospace, monospace`;
+        } catch (err) {
+          showToast("Canvas resize adjustment encountered an issue.");
+        }
+      }
+
+      function outlineCharIndex(gx, gy) {
+        const ax = Math.abs(gx);
+        const ay = Math.abs(gy);
+        if (ax + ay === 0) return IDX_PLUS;
+        if (ax > 2 * ay) return IDX_PIPE;
+        if (ay > 2 * ax) return gy > 0 ? IDX_UNDER : IDX_DASH;
+        return gx * gy > 0 ? IDX_SLASH : IDX_BACKSLASH;
+      }
+
+      /**
+       * Renders a single animation timestamp t onto the ASCII character grid and canvas.
+       */
+      function renderFrame(t) {
+        const totalCells = cols * rows;
+        partGrid.fill(-1);
+        depthGrid.fill(99.0);
+        lumGrid.fill(0);
+        tagGrid.fill(0);
+        charGrid.fill(IDX_SPACE);
+        gxGrid.fill(0);
+        gyGrid.fill(0);
+
+        const yaw = spinAngle(t);
+        const cosY = Math.cos(yaw);
+        const sinY = Math.sin(yaw);
+
+        const [keyX, keyY, keyZ] = norm3(0.0, 0.8, 0.6);
+        const [rimX, rimY, rimZ] = norm3(Math.cos(t * 0.9), 0.5, Math.sin(t * 0.9));
+
+        const [halfKX, halfKY, halfKZ] = norm3(
+          keyX + VIEW_DIR[0],
+          keyY + VIEW_DIR[1],
+          keyZ + VIEW_DIR[2]
+        );
+        const [halfRX, halfRY, halfRZ] = norm3(
+          rimX + VIEW_DIR[0],
+          rimY + VIEW_DIR[1],
+          rimZ + VIEW_DIR[2]
+        );
+
+        const revealHead = ((t - DRAW_START) / (DRAW_END - DRAW_START)) * RING.maxOrder;
+        const flashBoost = 1.0 + 0.8 * flashIntensity(t);
+        const fireShift = Math.floor(t * 7);
+
+        const maxPts =
+          RING.count * 2 +
+          DUST_COUNT +
+          STAR_COUNT +
+          SPARK_COUNT +
+          BURST_COUNT +
+          HALO_COUNT;
+
+        const pXArr = new Float32Array(maxPts);
+        const pYArr = new Float32Array(maxPts);
+        const pZArr = new Float32Array(maxPts);
+        const pShadeArr = new Float32Array(maxPts);
+        const pTagArr = new Uint8Array(maxPts);
+        const pPartArr = new Int16Array(maxPts);
+
+        let ptr = 0;
+        let glintCount = 0;
+
+        // 1. Ring geometry & floor reflection
+        for (let i = 0; i < RING.count; i++) {
+          const ox = RING.px[i];
+          const oy = RING.py[i];
+          const oz = RING.pz[i];
+
+          const bx = cosY * ox + sinY * oz;
+          const by = oy;
+          const bz = -sinY * ox + cosY * oz;
+
+          const onx = RING.nx[i];
+          const ony = RING.ny[i];
+          const onz = RING.nz[i];
+          const rnx = cosY * onx + sinY * onz;
+          const rny = ony;
+          const rnz = -sinY * onx + cosY * onz;
+
+          const kVis = smoothstep((revealHead - RING.orders[i]) / 0.06);
+          const isTip = Math.abs(revealHead - RING.orders[i]) < 0.035;
+
+          const diff = Math.max(0, rnx * keyX + rny * keyY + rnz * keyZ);
+          const specK = Math.pow(Math.max(0, rnx * halfKX + rny * halfKY + rnz * halfKZ), 30);
+          const specR = Math.pow(Math.max(0, rnx * halfRX + rny * halfRY + rnz * halfRZ), 24);
+          const spec = specK + 0.9 * specR;
+
+          const isMetal = RING.tags[i] !== TAG_GEM;
+          let shade = isMetal
+            ? 0.5 + 0.35 * diff + 0.9 * spec
+            : 0.8 + 0.2 * diff + 1.4 * spec;
+
+          let tag = RING.tags[i];
+          let part = RING.parts[i];
+
+          if (!isMetal && spec > 0.18) {
+            glintCount++;
+            const fire = (RING.gemFacets[i] + fireShift) % 4;
+            tag = fire === 0 ? TAG_GLINT : fire === 1 ? TAG_FIRE_R : fire === 2 ? TAG_FIRE_B : TAG_FIRE_G;
+          } else if (isMetal && spec > 0.5) {
+            tag = TAG_GLINT;
+          }
+
+          if (kVis < 0.96) {
+            part = -2;
+            shade = isTip ? 1.2 : 0.0;
+            tag = isTip ? TAG_GLINT : TAG_DUST;
+          }
+
+          shade *= flashBoost;
+
+          pXArr[ptr] = bx;
+          pYArr[ptr] = by;
+          pZArr[ptr] = bz;
+          pShadeArr[ptr] = shade;
+          pTagArr[ptr] = tag;
+          pPartArr[ptr] = part;
+          ptr++;
+
+          if (kVis >= 0.96) {
+            const reflY = 2 * FLOOR - by - 0.06;
+            const reflShade = 0.22 * Math.min(1.2, Math.max(0, shade / flashBoost));
+            if (reflShade > 0.02) {
+              pXArr[ptr] = bx;
+              pYArr[ptr] = reflY;
+              pZArr[ptr] = bz;
+              pShadeArr[ptr] = reflShade;
+              pTagArr[ptr] = TAG_REFL;
+              pPartArr[ptr] = -1;
+              ptr++;
+            }
+          }
+        }
+
+        // 2. Floating dust motes
+        const dustFade = smoothstep((t - BUILD + 0.5) / 1.5);
+        if (dustFade > 0.005) {
+          for (let i = 0; i < DUST_COUNT; i++) {
+            const ang = dstR0[i] * TAU + t * (0.3 + 0.5 * dstR1[i]);
+            const rad = 0.9 + 0.8 * dstR2[i];
+            const yPos = ((dstR3[i] * 2.4 + t * 0.08) % 2.4) - 0.8;
+            const sinTw = Math.max(0, Math.sin(t * (2 + 3 * dstR1[i]) + dstR0[i] * 40));
+            const tw = 0.25 + 0.75 * Math.pow(sinTw, 4);
+            const ds = tw * dustFade;
+            if (ds > 0.02) {
+              pXArr[ptr] = Math.cos(ang) * rad;
+              pYArr[ptr] = yPos;
+              pZArr[ptr] = Math.sin(ang) * rad * 0.7;
+              pShadeArr[ptr] = ds;
+              pTagArr[ptr] = TAG_DUST;
+              pPartArr[ptr] = -1;
+              ptr++;
+            }
+          }
+        }
+
+        // 3. Distant starfield
+        for (let i = 0; i < STAR_COUNT; i++) {
+          const ss = 0.1 + 0.1 * Math.sin(t * 2 + strR2[i] * TAU);
+          pXArr[ptr] = strR0[i] * 10 - 5;
+          pYArr[ptr] = strR1[i] * 6 - 1.5;
+          pZArr[ptr] = -6.0;
+          pShadeArr[ptr] = ss;
+          pTagArr[ptr] = TAG_STAR;
+          pPartArr[ptr] = -1;
+          ptr++;
+        }
+
+        // 4. Drawing tip sparks
+        for (let i = 0; i < SPARK_COUNT; i++) {
+          const age = t - spkBorn[i];
+          const life = 0.9 + 0.9 * spkR1[i];
+          if (age > 0 && age < life) {
+            const sIdx = spkIdx[i];
+            const a = spkR2[i] * TAU;
+            const horizSpeed = 0.4 + 0.6 * spkR3[i];
+            const vx = Math.cos(a) * horizSpeed;
+            const vy = 0.5 + 0.9 * spkR4[i];
+            const vz = Math.sin(a) * horizSpeed;
+
+            const sxPos = RING.px[sIdx] + vx * age;
+            const syPos = RING.py[sIdx] + vy * age - 0.5 * 2.2 * age * age;
+            const szPos = RING.pz[sIdx] + vz * age;
+
+            const pulse = 0.6 + 0.4 * Math.sin(age * 30 + a);
+            const glow = Math.pow(clamp01(1 - age / life), 1.3) * pulse;
+            if (glow > 0.02) {
+              pXArr[ptr] = sxPos;
+              pYArr[ptr] = syPos;
+              pZArr[ptr] = szPos;
+              pShadeArr[ptr] = glow;
+              pTagArr[ptr] = spkR3[i] > 0.7 ? TAG_GLINT : TAG_DUST;
+              pPartArr[ptr] = -1;
+              ptr++;
+            }
+          }
+        }
+
+        // 5. Expanding burst ring
+        const burstK = t - DRAW_END - 0.1;
+        if (burstK > 0 && burstK < 2.2) {
+          const glow = Math.pow(clamp01(1 - burstK / 2.2), 1.5);
+          if (glow > 0.02) {
+            const radBase = 0.85 + 2.4 * (1 - Math.exp(-burstK * 2.0));
+            for (let i = 0; i < BURST_COUNT; i++) {
+              const a = bstR0[i] * TAU;
+              const r = radBase * (0.97 + 0.06 * bstR1[i]);
+              const r1 = bstR1[i];
+              const kind =
+                r1 < 0.25 ? TAG_FIRE_R : r1 < 0.45 ? TAG_FIRE_B : r1 < 0.6 ? TAG_FIRE_G : TAG_GLINT;
+
+              pXArr[ptr] = Math.cos(a) * r;
+              pYArr[ptr] = 0.42 + Math.sin(a) * r;
+              pZArr[ptr] = (bstR2[i] - 0.5) * 0.05 - 0.4;
+              pShadeArr[ptr] = glow;
+              pTagArr[ptr] = kind;
+              pPartArr[ptr] = -1;
+              ptr++;
+            }
+          }
+        }
+
+        // 6. Two tilted orbital halos
+        const haloOn = smoothstep((t - DRAW_END - 0.3) / 1.5);
+        if (haloOn > 0.005) {
+          const halfN = Math.floor(HALO_COUNT / 2);
+          for (let i = 0; i < HALO_COUNT; i++) {
+            const isFirst = i < halfN;
+            const tilt = isFirst ? 0.55 : -0.55;
+            const angSpeed = isFirst ? 0.9 : -0.7;
+            const a = halR0[i] * TAU + t * angSpeed;
+
+            const ox = Math.cos(a) * 1.05;
+            const oy = Math.sin(a) * 0.32;
+            const oz = Math.sin(a) * 0.95;
+
+            const ct = Math.cos(tilt);
+            const st = Math.sin(tilt);
+            const hx = ox * ct - oy * st;
+            const hy = ox * st + oy * ct + 0.42;
+            const hz = oz;
+
+            const head = (halR0[i] * 37 + t * 1.3) % 1.0;
+            const shimmer = 0.6 + 0.4 * Math.sin(t * 6 + halR1[i] * TAU);
+            const glow = haloOn * (0.15 + 0.85 * clamp01(1 - head * 3)) * shimmer;
+
+            if (glow > 0.02) {
+              pXArr[ptr] = hx;
+              pYArr[ptr] = hy;
+              pZArr[ptr] = hz;
+              pShadeArr[ptr] = glow;
+              pTagArr[ptr] = halR1[i] > 0.5 ? TAG_DUST : TAG_GLINT;
+              pPartArr[ptr] = -1;
+              ptr++;
+            }
+          }
+        }
+
+        // Project 3D points into ASCII cell space and depth-sort far-to-near
+        const projX = new Float32Array(ptr);
+        const projY = new Float32Array(ptr);
+        const projZ = new Float32Array(ptr);
+        const indices = new Int32Array(ptr);
+
+        for (let i = 0; i < ptr; i++) {
+          indices[i] = i;
+          const rx = pXArr[i] - EYE[0];
+          const ry = pYArr[i] - EYE[1];
+          const rz = pZArr[i] - EYE[2];
+
+          const cxPos = rx * CAM_RIGHT[0] + ry * CAM_RIGHT[1] + rz * CAM_RIGHT[2];
+          const cyPos = rx * CAM_UP[0] + ry * CAM_UP[1] + rz * CAM_UP[2];
+          const czPos = rx * CAM_FWD[0] + ry * CAM_FWD[1] + rz * CAM_FWD[2];
+
+          const zz = Math.max(czPos, 0.2);
+          const focal = 2.9;
+          projX[i] = (0.5 + (cxPos / zz) * focal * 0.5) * cols;
+          projY[i] = (0.5 - (cyPos / zz) * focal * 0.5 * aspect) * rows;
+          projZ[i] = czPos;
+        }
+
+        indices.sort((a, b) => projZ[b] - projZ[a]);
+
+        // Rasterize solid body parts first
+        for (let k = 0; k < ptr; k++) {
+          const idx = indices[k];
+          const z = projZ[idx];
+          if (z <= 0.2) continue;
+          const part = pPartArr[idx];
+          if (part < 0) continue;
+
+          const ix = Math.floor(projX[idx]);
+          const iy = Math.floor(projY[idx]);
+          if (ix >= 0 && ix < cols && iy >= 0 && iy < rows) {
+            const cell = iy * cols + ix;
+            partGrid[cell] = part;
+            depthGrid[cell] = z;
+            lumGrid[cell] = pShadeArr[idx];
+            tagGrid[cell] = pTagArr[idx];
+          }
+        }
+
+        // Edge & facet boundary ASCII shader pass
+        const timeStep = Math.floor(t * 4);
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = r * cols + c;
+            const pHere = partGrid[cell];
+            if (pHere < 0) continue;
+
+            const dHere = depthGrid[cell];
+            const lumHere = lumGrid[cell];
+            const tagHere = tagGrid[cell];
+
+            let isEdge = false;
+            let gx = 0;
+            let gy = 0;
+
+            for (let dy = -1; dy <= 1; dy++) {
+              const nr = r + dy;
+              for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) continue;
+                const nc = c + dx;
+                let nb = -1;
+                let nz = 99.0;
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                  const nCell = nr * cols + nc;
+                  nb = partGrid[nCell];
+                  nz = depthGrid[nCell];
+                }
+                const out = nb < 0 || (nb !== pHere && nz > dHere + 0.02);
+                if (out) {
+                  gx += dx;
+                  gy += dy;
+                  if (dx === 0 || dy === 0) {
+                    isEdge = true;
+                  }
+                }
+              }
+            }
+
+            const hash = (r * 7919 + c * 104729) % 9973;
+            const level = Math.min(3, Math.max(0, Math.floor(lumHere * 3.2)));
+            const fillIdx = (hash + timeStep + (hash % 11)) % 12;
+            const insideChar = FILL_TABLE[level][fillIdx];
+
+            const isSparkle =
+              tagHere === TAG_GLINT ||
+              tagHere === TAG_FIRE_R ||
+              tagHere === TAG_FIRE_B ||
+              tagHere === TAG_FIRE_G;
+
+            if (isSparkle) {
+              charGrid[cell] = IDX_STAR;
+              lumGrid[cell] = Math.min(1, Math.max(0.3, lumHere));
+            } else if (isEdge) {
+              charGrid[cell] = outlineCharIndex(gx, gy);
+              lumGrid[cell] = Math.min(1, Math.max(0.75, lumHere));
+            } else {
+              charGrid[cell] = insideChar;
+              lumGrid[cell] = Math.min(1, Math.max(0.3, lumHere));
+            }
+
+            gxGrid[cell] = gx;
+            gyGrid[cell] = gy;
+          }
+        }
+
+        // Rasterize particles, reflection, and background stars
+        for (let k = 0; k < ptr; k++) {
+          const idx = indices[k];
+          if (pPartArr[idx] >= 0) continue;
+          const z = projZ[idx];
+          if (z <= 0.2) continue;
+          const shade = pShadeArr[idx];
+          if (shade <= 0.02) continue;
+
+          const ix = Math.floor(projX[idx]);
+          const iy = Math.floor(projY[idx]);
+          if (ix < 0 || ix >= cols || iy < 0 || iy >= rows) continue;
+
+          const cell = iy * cols + ix;
+          if (partGrid[cell] >= 0) {
+            continue;
+          }
+
+          const ft = pTagArr[idx];
+          let chIdx = IDX_DOT;
+          if (ft === TAG_REFL) {
+            const rLevel = Math.min(1, Math.max(0, Math.floor(shade * 6)));
+            chIdx = FILL_TABLE[rLevel][(iy * 31 + ix) % 12];
+          } else if (ft === TAG_DUST) {
+            chIdx = shade > 0.7 ? IDX_STAR : shade > 0.35 ? IDX_PLUS : IDX_DOT;
+          } else if (ft === TAG_STAR) {
+            chIdx = IDX_DOT;
+          } else {
+            const mod3 = (iy + ix) % 3;
+            chIdx = mod3 === 0 ? IDX_AMP : mod3 === 1 ? IDX_EIGHT : IDX_PCT;
+          }
+
+          charGrid[cell] = chIdx;
+          lumGrid[cell] = clamp01(shade);
+          tagGrid[cell] = ft;
+        }
+
+        // Starburst rays from brightest sparkle cells
+        const topSources = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cell = r * cols + c;
+            const tagHere = tagGrid[cell];
+            const isSparkleCell =
+              partGrid[cell] >= 0 &&
+              (tagHere === TAG_GLINT ||
+                tagHere === TAG_FIRE_R ||
+                tagHere === TAG_FIRE_B ||
+                tagHere === TAG_FIRE_G);
+            if (isSparkleCell) {
+              const hash = (r * 7919 + c * 104729) % 9973;
+              const score = lumGrid[cell] + (hash % 7) * 0.01;
+              topSources.push({ r, c, score });
+            }
+          }
+        }
+        topSources.sort((a, b) => b.score - a.score);
+        const rayCount = Math.min(6, topSources.length);
+
+        for (let n = 0; n < rayCount; n++) {
+          const src = topSources[n];
+          if (src.score <= 0) break;
+          const cy = src.r;
+          const cx = src.c;
+          const pulse = 0.5 + 0.5 * Math.sin(t * 7 + n * 1.7);
+          const reach = Math.floor(5 + 9 * pulse);
+
+          for (let dist = 1; dist <= reach; dist++) {
+            const fade = 1 - dist / (reach + 1);
+            const cardinals = [
+              [0, 1, IDX_DASH],
+              [0, -1, IDX_DASH],
+              [1, 0, IDX_PIPE],
+              [-1, 0, IDX_PIPE]
+            ];
+            for (let m = 0; m < cardinals.length; m++) {
+              const [dy, dx, rChar] = cardinals[m];
+              const yy = cy + dy * dist;
+              const xx = cx + dx * dist * 2;
+              if (yy >= 0 && yy < rows && xx >= 0 && xx < cols) {
+                const nCell = yy * cols + xx;
+                if (lumGrid[nCell] < fade) {
+                  charGrid[nCell] = rChar;
+                  lumGrid[nCell] = fade;
+                  tagGrid[nCell] = TAG_GLINT;
+                }
+              }
+            }
+
+            if (dist <= Math.floor(reach / 2)) {
+              const diagFade = fade * 0.7;
+              const diags = [
+                [1, 1, IDX_BACKSLASH],
+                [-1, -1, IDX_BACKSLASH],
+                [1, -1, IDX_SLASH],
+                [-1, 1, IDX_SLASH]
+              ];
+              for (let m = 0; m < diags.length; m++) {
+                const [dy, dx, dChar] = diags[m];
+                const yy = cy + dy * dist;
+                const xx = cx + dx * dist;
+                if (yy >= 0 && yy < rows && xx >= 0 && xx < cols) {
+                  const nCell = yy * cols + xx;
+                  if (lumGrid[nCell] < diagFade) {
+                    charGrid[nCell] = dChar;
+                    lumGrid[nCell] = diagFade;
+                    tagGrid[nCell] = TAG_GLINT;
+                  }
+                }
+              }
+            }
+          }
+
+          const centerCell = cy * cols + cx;
+          charGrid[centerCell] = IDX_STAR;
+          lumGrid[centerCell] = 1.0;
+        }
+
+        // Draw frame on canvas
+        const cssW = cols * cw;
+        const cssH = rows * ch;
+
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = trailsEnabled ? 0.42 : 1.0;
+        ctx.fillStyle = "#050508";
+        ctx.fillRect(0, 0, cssW, cssH);
+
+        ctx.globalCompositeOperation = "lighter";
+
+        for (let r = 0; r < rows; r++) {
+          const yPos = (r + 0.5) * ch;
+          for (let c = 0; c < cols; c++) {
+            const cell = r * cols + c;
+            const cIdx = charGrid[cell];
+            if (cIdx === IDX_SPACE) continue;
+
+            const alpha = clamp01(lumGrid[cell]);
+            if (alpha <= 0.02) continue;
+
+            const tagVal = Math.min(PALETTE.length - 1, tagGrid[cell]);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = PALETTE[tagVal];
+            ctx.fillText(CHAR_LIST[cIdx], (c + 0.5) * cw, yPos);
+          }
+        }
+
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1.0;
+
+        // Telemetry HUD update
+        const deg = (((yaw * 180) / Math.PI) % 360 + 360) % 360;
+        hudTime.textContent = `t ${t.toFixed(2).padStart(5, "0")}s`;
+        hudYaw.textContent = `rot ${deg.toFixed(1).padStart(5, "0")}°`;
+        hudGlints.textContent = `glints ${glintCount}`;
+      }
+
+      // Controls & state handlers
+      function syncPlayUI() {
+        if (paused) {
+          playIcon.textContent = "▶";
+          playLabel.textContent = "Resume";
+          statusDot.classList.remove("animate-pulse");
+          statusDot.classList.replace("bg-pink-400", "bg-zinc-500");
+        } else {
+          playIcon.textContent = "❚❚";
+          playLabel.textContent = "Pause";
+          statusDot.classList.add("animate-pulse");
+          statusDot.classList.replace("bg-zinc-500", "bg-pink-400");
+        }
+      }
+
+      function togglePlay() {
+        paused = !paused;
+        syncPlayUI();
+      }
+
+      function forceRestartAtTime(startTime, messageText) {
+        simTime = startTime;
+        paused = false;
+        syncPlayUI();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = "#050508";
+        ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+        renderFrame(simTime);
+        if (messageText) {
+          showToast(messageText);
+        }
+      }
+
+      function restartAnimation() {
+        forceRestartAtTime(0.0, "Animation restarted from t = 0.00s.");
+      }
+
+      function cycleSpeedAndForceRestart() {
+        speedIndex = (speedIndex + 1) % SPEEDS.length;
+        const nextSpeed = SPEEDS[speedIndex];
+        speedLabel.textContent = `Speed: ${nextSpeed.toFixed(1)}x`;
+        forceRestartAtTime(0.0, `Force restarted from t = 0.00s at ${nextSpeed.toFixed(1)}x speed.`);
+      }
+
+      function toggleTrails() {
+        trailsEnabled = !trailsEnabled;
+        trailLabel.textContent = `Trails: ${trailsEnabled ? "ON" : "OFF"}`;
+      }
+
+      togglePlayBtn.addEventListener("click", togglePlay);
+      canvas.addEventListener("click", togglePlay);
+      restartBtn.addEventListener("click", restartAnimation);
+      speedBtn.addEventListener("click", cycleSpeedAndForceRestart);
+      trailBtn.addEventListener("click", toggleTrails);
+
+      window.addEventListener("keydown", (e) => {
+        const activeTag = document.activeElement && document.activeElement.tagName;
+        if (activeTag === "INPUT" || activeTag === "TEXTAREA") return;
+
+        if (e.code === "Space") {
+          e.preventDefault();
+          togglePlay();
+        } else if (e.key === "r" || e.key === "R") {
+          restartAnimation();
+        } else if (e.key === "t" || e.key === "T") {
+          toggleTrails();
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        resizeStage();
+        renderFrame(simTime);
+      });
+
+      let lastTimestamp = null;
+
+      function loop(timestamp) {
+        if (lastTimestamp === null) lastTimestamp = timestamp;
+        const rawDt = (timestamp - lastTimestamp) / 1000;
+        lastTimestamp = timestamp;
+        const dt = Math.min(rawDt, 1 / 15);
+
+        if (!paused) {
+          simTime += dt * SPEEDS[speedIndex];
+          if (simTime > LOOP) {
+            simTime %= LOOP;
+          }
+          renderFrame(simTime);
+        }
+
+        requestAnimationFrame(loop);
+      }
+
+      window.onload = function () {
+        resizeStage();
+        renderFrame(simTime);
+        requestAnimationFrame(loop);
+      };
+    })();
+  </script>
+</body>
+</html>
